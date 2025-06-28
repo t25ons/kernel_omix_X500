@@ -52,7 +52,6 @@
 #if defined(CONFIG_MTK_GIC_V3_EXT)
 #include <linux/irqchip/mtk-gic-extend.h>
 #endif
-#include <mt-plat/l3cc_common.h>
 #ifdef CONFIG_MTK_TASK_TURBO
 #include <mt-plat/turbo_common.h>
 #endif
@@ -3896,7 +3895,6 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
 	kcov_prepare_switch(prev);
 	sched_info_switch(rq, prev, next);
 	perf_event_task_sched_out(prev, next);
-	hook_ca_context_switch(rq, prev, next);
 	fire_sched_out_preempt_notifiers(prev, next);
 	prepare_lock_switch(rq, next);
 	prepare_arch_switch(next);
@@ -4342,10 +4340,6 @@ void scheduler_tick(void)
 	rq_unlock(rq, &rf);
 
 	perf_event_task_tick();
-
-#ifdef CONFIG_MTK_CACHE_CONTROL
-	hook_ca_scheduler_tick(cpu);
-#endif
 #ifdef CONFIG_MTK_PERF_TRACKER
 	perf_tracker(ktime_get_ns());
 #endif
