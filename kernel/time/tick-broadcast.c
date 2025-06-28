@@ -20,7 +20,6 @@
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/module.h>
-#include <linux/sched/clock.h>
 
 #include "tick-internal.h"
 
