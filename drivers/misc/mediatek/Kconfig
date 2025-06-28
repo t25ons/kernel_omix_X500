@@ -326,23 +326,6 @@ source "drivers/misc/mediatek/cqdma/Kconfig"
 endmenu # Other Peripheral
 
 menu "Performance, Power, and Thermal"
-config MTK_PERF_TRACKER
-	bool "MTK system performance index support"
-	help
-	  CONFIG_PERF_TRACKER define if system performance index should
-	  be built-in or not. It supports system related performance index
-	  via trace. If you are not sure about whether to enable it or not,
-	  please set n.
-
-config MTK_LOWMEM_HINT
-	bool "MTK low memory thrash hint v2.0"
-	default n
-	help
-	  A hint to notify userspace if low-momory
-	  is occurs via uevent per second. The system in
-	  userspace can use the hint to make memory health
-	  improvement immediately.
-
 source "drivers/misc/mediatek/task_turbo/Kconfig"
 endmenu # PPT
 

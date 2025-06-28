@@ -43,8 +43,6 @@
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
 
-#include <mt-plat/perf_tracker.h>
-
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 #include "walt.h"
