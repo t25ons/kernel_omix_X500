@@ -1225,7 +1225,7 @@ EXIT:
 	return ret;
 }
 
-#define MAX_RQ_COUNT 200
+#define MAX_RQ_COUNT 100
 static int fbt_query_rq(int tgid, struct list_head *proc_list)
 {
 	int ret = 0;
@@ -1246,17 +1246,12 @@ static int fbt_query_rq(int tgid, struct list_head *proc_list)
 		list_for_each_entry(p, &cpu_rq(cpu)->cfs_tasks, se.group_node) {
 			rq_pid[rq_idx] = p->pid;
 			rq_idx++;
-
-			if (rq_idx >= MAX_RQ_COUNT) {
-				fpsgo_systrace_c_fbt(tgid, 0, rq_idx, "rq_shrink");
-				raw_spin_unlock_irqrestore(&cpu_rq(cpu)->lock, flags);
-				goto NEXT;
-			}
+			if (rq_idx >= MAX_RQ_COUNT)
+				break;
 		}
 		raw_spin_unlock_irqrestore(&cpu_rq(cpu)->lock, flags);
 	}
 
-NEXT:
 	if (!rq_idx)
 		goto EXIT;
 
