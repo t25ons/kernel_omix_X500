@@ -150,11 +150,10 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 
 				 if (__ratelimit(&ratelimit))
 					PK_DBG(
-					"sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_on %d, delay %u",
+					"sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_on %d",
 					sensor_idx,
 					ppwr_info->pin,
-					ppwr_info->pin_state_on,
-					ppwr_info->pin_on_delay);
+					ppwr_info->pin_state_on);
 
 				if (pdev->set != NULL)
 					pdev->set(pdev->pinstance,
@@ -176,11 +175,10 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 
 			if (__ratelimit(&ratelimit))
 				PK_DBG(
-				"sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_off %d, delay %u",
+				"sensor_idx %d, ppwr_info->pin %d, ppwr_info->pin_state_off %d",
 				sensor_idx,
 				ppwr_info->pin,
-				ppwr_info->pin_state_off,
-				ppwr_info->pin_on_delay);
+				ppwr_info->pin_state_off);
 
 			if (ppwr_info->pin != IMGSENSOR_HW_PIN_UNDEF) {
 				pdev =
