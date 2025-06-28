@@ -110,7 +110,6 @@ enum mmdvfs_log_level {
 	log_limit,
 	log_smi_freq,
 	log_qos_validation,
-	log_qoslarb,
 };
 
 #define STEP_UNREQUEST -1
@@ -1198,7 +1197,7 @@ void mm_qos_update_all_request(struct plist_head *owner_list)
 	u64 profile;
 	u32 i = 0, larb_update = 0, mm_bw = 0;
 	s32 next_hrt_bw;
-	s32 cam_bw, larb_bw;
+	s32 cam_bw;
 	u32 larb_count = 0, larb_id = 0, larb_port_id = 0, larb_port_bw = 0;
 	u32 port_id = 0;
 	u32 comm, comm_port;
@@ -1385,13 +1384,9 @@ void mm_qos_update_all_request(struct plist_head *owner_list)
 #endif
 
 	/* update mm total bw */
-	for (i = 0; i < MAX_LARB_COUNT; i++) {
-		larb_bw = (larb_req[i].comm_port != SMI_COMM_MASTER_NUM) ?
+	for (i = 0; i < MAX_LARB_COUNT; i++)
+		mm_bw += (larb_req[i].comm_port != SMI_COMM_MASTER_NUM) ?
 			larb_req[i].total_bw_data : 0;
-		mm_bw += larb_bw;
-		if (log_level & 1 << log_qoslarb)
-			trace_mmqos__update_qoslarb(i, larb_bw);
-	}
 	pm_qos_update_request(&mm_bw_request, mm_bw);
 	if (log_level & 1 << log_bw)
 		pr_notice("config mm_bw=%d\n", mm_bw);
