@@ -127,7 +127,4 @@ struct zram {
 	struct dentry *debugfs_dir;
 #endif
 };
-
-/* mlog */
-unsigned long zram_mlog(void);
 #endif
