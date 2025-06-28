@@ -221,10 +221,6 @@ extern void scheduler_tick(void);
 
 #define	MAX_SCHEDULE_TIMEOUT		LONG_MAX
 
-#ifdef CONFIG_DEBUG_PREEMPT
-#define PREEMPT_DISABLE_DEEPTH 5
-#endif
-
 extern long schedule_timeout(long timeout);
 extern long schedule_timeout_interruptible(long timeout);
 extern long schedule_timeout_killable(long timeout);
@@ -1190,7 +1186,6 @@ struct task_struct {
 #endif
 #ifdef CONFIG_DEBUG_PREEMPT
 	unsigned long			preempt_disable_ip;
-	unsigned long preempt_disable_ips[PREEMPT_DISABLE_DEEPTH];
 #endif
 #ifdef CONFIG_NUMA
 	/* Protected by alloc_lock: */
