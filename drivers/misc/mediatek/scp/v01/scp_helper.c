@@ -1429,6 +1429,7 @@ void reset_sram_state_machine(void)
  *****************************************************************************/
 void print_clk_registers(void)
 {
+	void __iomem *loader_base = (void __iomem *)scp_loader_base_virt;
 	void __iomem *cfg = scpreg.cfg;          // 0x105C_0000
 	void __iomem *clkctrl = scpreg.clkctrl;  // 0x105C_4000
 	unsigned int offset;
@@ -1463,6 +1464,14 @@ void print_clk_registers(void)
 			pr_notice("[SCP] SRAM W/R failed! loader[4]: 0x%08x\n",
 				value);
 			cmp_error = 1;
+		}
+	}
+
+	// Print the first few bytes of the loader binary.
+	if (loader_base) {
+		for (offset = 0; offset < 16; offset += 4) {
+			value = (unsigned int)readl(loader_base + offset);
+			pr_notice("[SCP] loader[%u]: 0x%08x\n", offset, value);
 		}
 	}
 
