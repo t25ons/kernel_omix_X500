@@ -90,6 +90,8 @@ static struct stAF_OisPosInfo OisPosInfo;
 static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	{1, AFDRV_DW9718TAF, DW9718TAF_SetI2Cclient, DW9718TAF_Ioctl,
 	 DW9718TAF_Release, DW9718TAF_GetFileName, NULL},
+	{1, AFDRV_GT9772AF, GT9772AF_SetI2Cclient, GT9772AF_Ioctl,
+	 GT9772AF_Release, GT9772AF_GetFileName, NULL},
 	{1, AFDRV_AK7371AF, AK7371AF_SetI2Cclient, AK7371AF_Ioctl,
 	 AK7371AF_Release, AK7371AF_GetFileName, NULL},
 	{1, AFDRV_BU6424AF, BU6424AF_SetI2Cclient, BU6424AF_Ioctl,
@@ -123,6 +125,10 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	DW9800WAF_Release, DW9800WAF_GetFileName, NULL},
 	{1, AFDRV_DW9814AF, DW9814AF_SetI2Cclient, DW9814AF_Ioctl,
 	 DW9814AF_Release, DW9814AF_GetFileName, NULL},
+//prize add by liaojie for patch MTK_PATCH:t-alps-release-q0.mp1-V6 20191218-start
+	{1, AFDRV_DW9800WAF, DW9800WAF_SetI2Cclient, DW9800WAF_Ioctl,
+	 DW9800WAF_Release, NULL, NULL},
+	 //prize add by liaojie for patch MTK_PATCH:t-alps-release-q0.mp1-V6 20191218-end
 	{1, AFDRV_DW9839AF, DW9839AF_SetI2Cclient, DW9839AF_Ioctl,
 	 DW9839AF_Release, DW9839AF_GetFileName, NULL},
 	{1, AFDRV_FP5510E2AF, FP5510E2AF_SetI2Cclient, FP5510E2AF_Ioctl,
@@ -151,6 +157,11 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	 LC898122AF_Release, LC898122AF_GetFileName, NULL},
 	{1, AFDRV_WV511AAF, WV511AAF_SetI2Cclient, WV511AAF_Ioctl,
 	 WV511AAF_Release, WV511AAF_GetFileName, NULL},
+/*prize  add  for main af by zhuzhengjiang    20191018-start*/
+	#ifdef CONFIG_MTK_LENS_DW9800WAF_SUPPORT
+		{1, AFDRV_DW9800WAF, DW9800WAF_SetI2Cclient, DW9800WAF_Ioctl, DW9800WAF_Release, NULL},
+	#endif
+/*prize  add  for main af by zhuzhengjiang    20191018-end*/
 };
 
 static struct stAF_DrvList *g_pstAF_CurDrv;
@@ -264,7 +275,7 @@ static int g_regVCAMAFEn;
 
 void AFRegulatorCtrl(int Stage)
 {
-	LOG_INF("AFIOC_S_SETPOWERCTRL regulator_put %p\n", regVCAMAF);
+	LOG_INF("prize AFIOC_S_SETPOWERCTRL regulator_put %p, Stage=%d\n", regVCAMAF, Stage);
 
 	if (Stage == 0) {
 		if (regVCAMAF == NULL) {
@@ -355,7 +366,7 @@ void AFRegulatorCtrl(int Stage)
 		if (regVCAMAF != NULL && g_regVCAMAFEn == 1) {
 			int Status = regulator_is_enabled(regVCAMAF);
 
-			LOG_INF("regulator_is_enabled %d\n", Status);
+			LOG_INF("prize regulator_is_enabled %d\n", Status);
 
 			if (Status) {
 				LOG_INF("Camera Power enable\n");
@@ -366,7 +377,7 @@ void AFRegulatorCtrl(int Stage)
 					LOG_INF("Fail to regulator_disable\n");
 			}
 			/* regulator_put(regVCAMAF); */
-			LOG_INF("AFIOC_S_SETPOWERCTRL regulator_put %p\n",
+			LOG_INF("xxx AFIOC_S_SETPOWERCTRL regulator_put %p\n",
 				regVCAMAF);
 			/* regVCAMAF = NULL; */
 			g_regVCAMAFEn = 0;
@@ -872,6 +883,10 @@ static int AF_i2c_probe(struct i2c_client *client,
 	}
 
 	spin_lock_init(&g_AF_SpinLock);
+
+#if !defined(CONFIG_MTK_LEGACY)
+	AFRegulatorCtrl(0);
+#endif
 
 	LOG_INF("Attached!!\n");
 

@@ -20,6 +20,7 @@
 #include <upmu_common.h>
 #include "mtk_charger_intf.h"
 #include "mtk_charger_init.h"
+extern bool prize_is_pump_express(void);  // prize add by liaoxingen for pump express menu switch
 
 /* Unit of the following functions are uV, uA */
 static inline u32 pe_get_vbus(void)
@@ -376,6 +377,7 @@ int mtk_pe_check_charger(struct charger_manager *pinfo)
 {
 	int ret = 0;
 	struct mtk_pe *pe = &pinfo->pe;
+	chr_info("%s pinfo->enable_pe_plus=%d, pe->is_enabled=%d\n", __func__,pinfo->enable_pe_plus,pe->is_enabled);
 
 	if (!pinfo->enable_hv_charging) {
 		pr_info("%s: hv charging is disabled\n", __func__);
@@ -488,11 +490,11 @@ int mtk_pe_start_algorithm(struct charger_manager *pinfo)
 
 	chr_debug("%s: starts\n", __func__);
 
-	if (mt_get_charger_type() == CHARGER_UNKNOWN || pe->is_cable_out_occur)
+	if (mt_get_charger_type() == CHARGER_UNKNOWN || pe->is_cable_out_occur || !prize_is_pump_express())
 		mtk_pe_plugout_reset(pinfo);
 
 	/* TA is not connected */
-	if (!pe->is_connect) {
+	if (!pe->is_connect|| !prize_is_pump_express()) {
 		ret = -EIO;
 		chr_info("%s: stop, PE+ is not connected\n", __func__);
 		goto _out;
@@ -611,6 +613,7 @@ void mtk_pe_set_is_enable(struct charger_manager *pinfo, bool enable)
 
 	chr_info("%s: enable = %d\n", __func__, enable);
 	pinfo->pe.is_enabled = enable;
+//	pinfo->pe.is_enabled = (prize_is_pump_express()?pinfo->pe.is_enabled:false); // prize add by liaoxingen for pump express menu switch
 
 	__pm_relax(&pinfo->pe.suspend_lock);
 	mutex_unlock(&pinfo->pe.access_lock);

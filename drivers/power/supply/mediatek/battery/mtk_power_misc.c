@@ -145,7 +145,13 @@ int disable_shutdown_cond(int shutdown_cond)
 	}
 	return 0;
 }
-
+/* begin, prize-lifenfen-20181207, add fuel gauge cw2015 */
+#if defined(CONFIG_MTK_CW2015_SUPPORT)
+extern int g_cw2015_capacity;
+extern int g_cw2015_vol;
+extern int cw2015_exit_flag;
+#endif
+/* end, prize-lifenfen-20181207, add fuel gauge cw2015 */
 int set_shutdown_cond(int shutdown_cond)
 {
 	int now_current;
@@ -174,7 +180,12 @@ int set_shutdown_cond(int shutdown_cond)
 		shutdown_cond, enable_lbat_shutdown,
 		now_is_kpoc, now_current, now_is_charging,
 		shutdown_cond_flag, vbat);
-
+	//prize-0% solution can also use mobile phone-pengzhipeng-20210303-start	
+#if defined(CONFIG_MTK_CW2015_SUPPORT)
+	if (g_cw2015_capacity > 1 && vbat > BAT_VOLTAGE_LOW_BOUND)  //vabt > 3.4v,电量计不准会导致过放
+		return 0;
+#endif
+	//prize-0% solution can also use mobile phone-pengzhipeng-20210303-end	
 	if (shutdown_cond_flag == 1)
 		return 0;
 

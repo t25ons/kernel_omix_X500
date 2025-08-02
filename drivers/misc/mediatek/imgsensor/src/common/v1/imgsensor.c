@@ -60,6 +60,12 @@
 #ifdef CONFIG_MTK_SMI_EXT
 static int current_mmsys_clk = MMSYS_CLK_MEDIUM;
 #endif
+//prize-zhuzhengjiang-20200904-start
+#if defined(CONFIG_PRIZE_HARDWARE_INFO)
+#include "../../../hardware_info/hardware_info.h"
+extern struct hardware_info current_camera_info[5];
+#endif
+//prize-zhuzhengjiang-20200904-end
 
 /* Test Only!! Open this define for temperature meter UT */
 /* Temperature workqueue */
@@ -87,6 +93,7 @@ struct mutex imgsensor_mutex;
 
 
 DEFINE_MUTEX(pinctrl_mutex);
+DEFINE_MUTEX(oc_mutex);
 
 /************************************************************************
  * Profiling
@@ -183,6 +190,7 @@ imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 
 		/* turn on power */
 		IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
+		imgsensor_mutex_lock(psensor_inst); // prize add by zhuzhengjiang for dual camera open failed 20210302
 		if (pgimgsensor->imgsensor_oc_irq_enable != NULL)
 			pgimgsensor->imgsensor_oc_irq_enable(
 					psensor->inst.sensor_idx, false);
@@ -194,6 +202,7 @@ imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 
 		if (ret != IMGSENSOR_RETURN_SUCCESS) {
 			pr_err("[%s]", __func__);
+			imgsensor_mutex_unlock(psensor_inst);// prize add by zhuzhengjiang for dual camera open failed 20210302
 			return -EIO;
 		}
 		/* wait for power stable */
@@ -202,7 +211,7 @@ imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 		IMGSENSOR_PROFILE(&psensor_inst->profile_time,
 		    "kdCISModulePowerOn");
 
-		imgsensor_mutex_lock(psensor_inst);
+		//imgsensor_mutex_lock(psensor_inst);// prize remove by zhuzhengjiang for dual camera open failed 20210302
 
 		psensor_func->psensor_inst = psensor_inst;
 		ret = psensor_func->SensorOpen();
@@ -416,6 +425,10 @@ imgsensor_sensor_close(struct IMGSENSOR_SENSOR *psensor)
 
 		psensor_func->psensor_inst = psensor_inst;
 
+		if (pgimgsensor->imgsensor_oc_irq_enable != NULL)
+			pgimgsensor->imgsensor_oc_irq_enable(
+					psensor->inst.sensor_idx, false);
+
 		ret = psensor_func->SensorClose();
 		if (ret != ERROR_NONE) {
 			pr_err("[%s]", __func__);
@@ -465,6 +478,33 @@ static inline int imgsensor_check_is_alive(struct IMGSENSOR_SENSOR *psensor)
 	} else {
 		pr_info(" Sensor found ID = 0x%x\n", sensorID);
 		err = ERROR_NONE;
+		//prize-zhuzhengjiang-20200904-start
+		#if defined(CONFIG_PRIZE_HARDWARE_INFO)
+		if(psensor->inst.sensor_idx >= 0 && psensor->inst.sensor_idx < 5)
+		{
+			if (sensorID == 0x30a) {
+				strcpy(current_camera_info[2].chip,psensor_inst->psensor_name);
+				sprintf(current_camera_info[2].id,"0x%04x",sensorID);
+				strcpy(current_camera_info[2].vendor,"unknow");
+
+			}else {
+				strcpy(current_camera_info[psensor->inst.sensor_idx].chip,psensor_inst->psensor_name);
+    			sprintf(current_camera_info[psensor->inst.sensor_idx].id,"0x%04x",sensorID);
+    			strcpy(current_camera_info[psensor->inst.sensor_idx].vendor,"unknow");
+			}
+			if (1){
+				MSDK_SENSOR_RESOLUTION_INFO_STRUCT sensorResolution;
+				imgsensor_sensor_get_resolution(psensor,&sensorResolution);
+				if (sensorID == 0x30a){
+					sprintf(current_camera_info[2].more,"%d*%d",sensorResolution.SensorFullWidth,sensorResolution.SensorFullHeight);
+
+				}else{
+					sprintf(current_camera_info[psensor->inst.sensor_idx].more,"%d*%d",sensorResolution.SensorFullWidth,sensorResolution.SensorFullHeight);
+				}
+			}
+		}
+		#endif
+		//prize-zhuzhengjiang-20200904-end
 	}
 
 	if (err != ERROR_NONE)
@@ -1369,6 +1409,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		break;
 	case SENSOR_FEATURE_SET_SENSOR_SYNC:
 	case SENSOR_FEATURE_SET_ESHUTTER_GAIN:
+
 		pr_debug("[kd_sensorlist]enter kdSetExpGain\n");
 		if (copy_from_user(
 		    (void *)pFeaturePara,
@@ -1427,6 +1468,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	case SENSOR_FEATURE_SET_DRIVER:
 	case SENSOR_FEATURE_CHECK_IS_ALIVE:
 		break;
+	case SENSOR_FEATURE_GET_OFFSET_TO_START_OF_EXPOSURE:// prize add for its:test_sensor_fusion 20201029 start
 	case SENSOR_FEATURE_GET_DEFAULT_FRAME_RATE_BY_SCENARIO:
 	case SENSOR_FEATURE_GET_SENSOR_PDAF_CAPACITY:
 	case SENSOR_FEATURE_GET_SENSOR_HDR_CAPACITY:
@@ -1436,6 +1478,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		MUINT32 *pValue = NULL;
 		unsigned long long *pFeaturePara_64 =
 		    (unsigned long long *)pFeaturePara;
+
+		if (FeatureParaLen < 2 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
 
 		pValue = kmalloc(sizeof(MUINT32), GFP_KERNEL);
 		if (pValue == NULL) {
@@ -1490,6 +1538,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		unsigned long long *pFeaturePara_64 =
 		    (unsigned long long *)pFeaturePara;
 
+		if (FeatureParaLen < 2 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
+
 		pValue0 = kmalloc(sizeof(MUINT32), GFP_KERNEL);
 		pValue1 = kmalloc(sizeof(MUINT32), GFP_KERNEL);
 
@@ -1525,6 +1579,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		    (unsigned long long *)pFeaturePara;
 
 		void *usr_ptr = (void *)(uintptr_t)(*(pFeaturePara_64));
+
+		if (FeatureParaLen < 1 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
 
 		pAeAwbRef = kmalloc(
 		    sizeof(struct SENSOR_AE_AWB_REF_STRUCT),
@@ -1567,6 +1627,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 
 		void *usr_ptr = (void *)(uintptr_t) (*(pFeaturePara_64 + 1));
 
+		if (FeatureParaLen < 2 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
+
 		pCrop = kmalloc(
 		    sizeof(struct SENSOR_WINSIZE_INFO_STRUCT),
 		    GFP_KERNEL);
@@ -1605,6 +1671,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 
 		void *usr_ptr = (void *)(uintptr_t) (*(pFeaturePara_64 + 1));
 
+		if (FeatureParaLen < 2 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
+
 		pVcInfo = kmalloc(
 		    sizeof(struct SENSOR_VC_INFO_STRUCT),
 		    GFP_KERNEL);
@@ -1641,6 +1713,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		    (unsigned long long *)pFeaturePara;
 
 		void *usr_ptr = (void *)(uintptr_t) (*(pFeaturePara_64 + 1));
+
+		if (FeatureParaLen < 2 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
 
 		pPdInfo = kmalloc(
 		    sizeof(struct SET_PD_BLOCK_INFO_T),
@@ -1681,6 +1759,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		void *usr_ptr_Reg =
 		    (void *)(uintptr_t) (*(pFeaturePara_64 + 1));
 		kal_uint32 *pReg = NULL;
+
+		if (FeatureParaLen < 2 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
 
 		if (u4RegLen > PDAF_DATA_SIZE) {
 			kfree(pFeaturePara);
@@ -1764,6 +1848,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 
 		void *usr_ptr =  (void *)(uintptr_t) (*(pFeaturePara_64));
 
+		if (FeatureParaLen < 1 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
+
 		pExif = kmalloc(
 		    sizeof(struct SENSOR_EXIF_INFO_STRUCT),
 		    GFP_KERNEL);
@@ -1801,6 +1891,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		    (unsigned long long *)pFeaturePara;
 
 		void *usr_ptr = (void *)(uintptr_t) (*(pFeaturePara_64));
+
+		if (FeatureParaLen < 1 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
 
 		pCurAEAWB = kmalloc(
 		    sizeof(struct SENSOR_AE_AWB_CUR_STRUCT),
@@ -1845,6 +1941,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 
 		void *usr_ptr = (void *)(uintptr_t) (*(pFeaturePara_64));
 
+		if (FeatureParaLen < 1 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
+
 		pDelayInfo = kmalloc(
 		    sizeof(struct SENSOR_DELAY_INFO_STRUCT),
 		    GFP_KERNEL);
@@ -1886,6 +1988,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		    (unsigned long long *)pFeaturePara;
 
 		void *usr_ptr = (void *)(uintptr_t) (*(pFeaturePara_64));
+
+		if (FeatureParaLen < 1 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
 
 		pFlashInfo = kmalloc(
 		    sizeof(struct SENSOR_FLASHLIGHT_AE_INFO_STRUCT),
@@ -1929,6 +2037,12 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		    (unsigned long long *) pFeaturePara;
 		void *usr_ptr = (void *)(uintptr_t)(*(pFeaturePara_64 + 1));
 		kal_uint32 buf_size = (kal_uint32) (*(pFeaturePara_64 + 2));
+
+		if (FeatureParaLen < 3 * sizeof(unsigned long long)) {
+			pr_debug("FeatureParaLen is too small %d\n", FeatureParaLen);
+			kfree(pFeaturePara);
+			return -EINVAL;
+		}
 
 		if (buf_size > PDAF_DATA_SIZE) {
 			kfree(pFeaturePara);
@@ -2511,6 +2625,7 @@ static long imgsensor_ioctl(
 	default:
 		pr_debug("No such command %d\n", a_u4Command);
 		i4RetValue = -EPERM;
+		goto CAMERA_HW_Ioctl_EXIT;
 		break;
 	}
 
@@ -2524,13 +2639,16 @@ static long imgsensor_ioctl(
 		goto CAMERA_HW_Ioctl_EXIT;
 	}
 
-	kfree(pBuff);
 CAMERA_HW_Ioctl_EXIT:
+	if (pBuff != NULL)
+		kfree(pBuff);
 	return i4RetValue;
 }
 
 static int imgsensor_open(struct inode *a_pstInode, struct file *a_pstFile)
 {
+	/*prize add by zhuzhengjiang for open camera failed 20210506 start*/
+#if 0 // origin mtk code
 	mutex_lock(&imgsensor_mutex);
 
 	if (atomic_read(&pgimgsensor->imgsensor_open_cnt) == 0)
@@ -2543,6 +2661,17 @@ static int imgsensor_open(struct inode *a_pstInode, struct file *a_pstFile)
 	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
 
 	mutex_unlock(&imgsensor_mutex);
+#endif
+	mutex_lock(&pgimgsensor->imgsensor_clk_mutex);
+	(pgimgsensor->imgsensor_open_cnt_mux)++;
+	imgsensor_clk_enable_all(&pgimgsensor->clk);
+	pr_info(
+	    "%s %d\n",
+	    __func__,
+	    pgimgsensor->imgsensor_open_cnt_mux);
+
+	mutex_unlock(&pgimgsensor->imgsensor_clk_mutex);
+	/*prize add by zhuzhengjiang for open camera failed 20210506 end*/
 
 	return 0;
 }
@@ -2550,7 +2679,8 @@ static int imgsensor_open(struct inode *a_pstInode, struct file *a_pstFile)
 static int imgsensor_release(struct inode *a_pstInode, struct file *a_pstFile)
 {
 	enum IMGSENSOR_SENSOR_IDX i = IMGSENSOR_SENSOR_IDX_MIN_NUM;
-
+	/*prize add by zhuzhengjiang for open camera failed 20210506 start*/
+#if 0 // origin mtk code
 	mutex_lock(&imgsensor_mutex);
 
 	atomic_dec(&pgimgsensor->imgsensor_open_cnt);
@@ -2573,6 +2703,31 @@ static int imgsensor_release(struct inode *a_pstInode, struct file *a_pstFile)
 	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
 
 	mutex_unlock(&imgsensor_mutex);
+#endif
+
+	mutex_lock(&pgimgsensor->imgsensor_clk_mutex);
+	(pgimgsensor->imgsensor_open_cnt_mux)--;
+
+	if (0  == pgimgsensor->imgsensor_open_cnt_mux) {
+		imgsensor_clk_disable_all(&pgimgsensor->clk);
+
+		if (pgimgsensor->imgsensor_oc_irq_enable != NULL) {
+			for (; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++)
+				pgimgsensor->imgsensor_oc_irq_enable(i, false);
+		}
+
+		imgsensor_hw_release_all(&pgimgsensor->hw);
+#ifdef IMGSENSOR_DFS_CTRL_ENABLE
+		imgsensor_dfs_ctrl(DFS_RELEASE, NULL);
+#endif
+	}
+	pr_info(
+	    "%s %d\n",
+	    __func__,
+	    pgimgsensor->imgsensor_open_cnt_mux);
+
+	mutex_unlock(&pgimgsensor->imgsensor_clk_mutex);
+	/*prize add by zhuzhengjiang for open camera failed 20210506 end*/
 
 	return 0;
 }
@@ -2676,8 +2831,12 @@ static int imgsensor_probe(struct platform_device *pdev)
 	imgsensor_hw_init(&pgimgsensor->hw);
 	imgsensor_i2c_create();
 	imgsensor_proc_init();
+	/*prize add by zhuzhengjiang for open camera failed 20210506 start*/
+	mutex_init(&pgimgsensor->imgsensor_clk_mutex);
+	pgimgsensor->imgsensor_open_cnt_mux = 0;
 
-	atomic_set(&pgimgsensor->imgsensor_open_cnt, 0);
+	//atomic_set(&pgimgsensor->imgsensor_open_cnt, 0);
+	/*prize add by zhuzhengjiang for open camera failed 20210506 end*/
 #ifdef CONFIG_MTK_SMI_EXT
 	mmdvfs_register_mmclk_switch_cb(
 	    mmsys_clk_change_cb,

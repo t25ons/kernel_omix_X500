@@ -72,9 +72,13 @@ struct pm_qos_request imgsensor_qos;
 int imgsensor_dfs_ctrl(enum DFS_OPTION option, void *pbuff)
 {
 	int i4RetValue = 0;
-	if (pbuff == NULL) {
-		pr_info("pbuff == null");
-		return IMGSENSOR_RETURN_ERROR;
+	if ((option == DFS_UPDATE ||
+		option == DFS_SUPPORTED_ISP_CLOCKS ||
+		option == DFS_CUR_ISP_CLOCK)) {
+		if (pbuff == NULL) {
+			pr_info("pbuff == null");
+			return IMGSENSOR_RETURN_ERROR;
+		}
 	}
 	/*pr_info("%s\n", __func__);*/
 
@@ -242,7 +246,40 @@ int imgsensor_clk_set(
 		ret = clk_set_parent(
 		    pclk->imgsensor_ccf[pmclk->TG],
 		    pclk->imgsensor_ccf[mclk_index]);
+	/*prize add by zhuzhengjiang for dcam_r mclk 20210630 start */
+	#ifdef CONFIG_PRIZE_DUAL_CAMERA_ENABLE 
+		if(pmclk->TG == 0) {
+			pr_err(
+					"prize add 1 [CAMERA SENSOR] tg=%d mclk_index=%d\n",IMGSENSOR_CCF_MCLK_TOP_CAMTG_SEL,mclk_index);
+			if (clk_prepare_enable(
+				pclk->imgsensor_ccf[IMGSENSOR_CCF_MCLK_TOP_CAMTG_SEL]))
 
+				pr_err(
+					"[CAMERA SENSOR] failed tg=%d\n",
+					IMGSENSOR_CCF_MCLK_TOP_CAMTG_SEL);
+			else
+				atomic_inc(
+				   &pclk->enable_cnt[IMGSENSOR_CCF_MCLK_TOP_CAMTG_SEL]);
+
+			if (clk_prepare_enable(pclk->imgsensor_ccf[pmclk->TG+3]))
+				pr_err("[CAMERA SENSOR] failed tg=%d\n", pmclk->TG+3);
+			else
+				atomic_inc(&pclk->enable_cnt[pmclk->TG+3]);
+
+			if (clk_prepare_enable(pclk->imgsensor_ccf[mclk_index]))
+				pr_err(
+					"[CAMERA SENSOR]imgsensor_ccf failed freq= %d, mclk_index %d\n",
+					pmclk->freq,
+					mclk_index);
+			else
+				atomic_inc(&pclk->enable_cnt[mclk_index]);
+
+			ret = clk_set_parent(
+				pclk->imgsensor_ccf[pmclk->TG+3],
+				pclk->imgsensor_ccf[mclk_index]);
+		}
+	#endif
+	/*prize add by zhuzhengjiang for dcam_r mclk 20210630 end */ 
 	} else {
 
 		/* Workaround for timestamp: TG1 always ON */
@@ -255,6 +292,16 @@ int imgsensor_clk_set(
 		atomic_dec(&pclk->enable_cnt[pmclk->TG]);
 		clk_disable_unprepare(pclk->imgsensor_ccf[mclk_index]);
 		atomic_dec(&pclk->enable_cnt[mclk_index]);
+	/*prize add by zhuzhengjiang for dcam_r mclk 20210630 start */
+	#ifdef CONFIG_PRIZE_DUAL_CAMERA_ENABLE 	
+		if(pmclk->TG == 0) {
+			clk_disable_unprepare(pclk->imgsensor_ccf[pmclk->TG+3]);
+			atomic_dec(&pclk->enable_cnt[pmclk->TG+3]);
+			clk_disable_unprepare(pclk->imgsensor_ccf[mclk_index]);
+			atomic_dec(&pclk->enable_cnt[mclk_index]);
+		}
+	#endif
+	/*prize add by zhuzhengjiang for dcam_r mclk 20210630 end */ 
 	}
 
 	return ret;
@@ -296,8 +343,7 @@ void imgsensor_clk_enable_all(struct IMGSENSOR_CLK *pclk)
 
 void imgsensor_clk_disable_all(struct IMGSENSOR_CLK *pclk)
 {
-	int i;
-
+	unsigned int i;
 	pr_info("%s\n", __func__);
 	for (i = IMGSENSOR_CCF_MCLK_TG_MIN_NUM;
 		i < IMGSENSOR_CCF_MAX_NUM;
@@ -312,11 +358,10 @@ void imgsensor_clk_disable_all(struct IMGSENSOR_CLK *pclk)
 
 int imgsensor_clk_ioctrl_handler(void *pbuff)
 {
-	if (pbuff == NULL) {
-		pr_info("pbuff == null");
-		return IMGSENSOR_RETURN_ERROR;
-	}
-	*(unsigned int *)pbuff = mt_get_ckgen_freq(*(unsigned int *)pbuff);
+	if (pbuff == NULL)
+		pr_info(" %s pbuff == null", __func__);
+	else
+		*(unsigned int *)pbuff = mt_get_ckgen_freq(*(unsigned int *)pbuff);
 	pr_info("hf_fcamtg_ck = %d, hf_fmm_ck = %d, f_fseninf_ck = %d\n",
 		mt_get_ckgen_freq(7),
 		mt_get_ckgen_freq(3),

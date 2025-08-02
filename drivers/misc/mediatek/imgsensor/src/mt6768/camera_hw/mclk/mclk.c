@@ -178,6 +178,40 @@ pinst->ppinctrl_state[(unsigned int)sensor_idx][(unsigned int)state_index];
 			    pin_state,
 				pinst->drive_current[(unsigned int)sensor_idx]);
 		mutex_unlock(&pinctrl_mutex);
+	/*prize add by zhuzhengjiang for dcam_r mclk 20210630 start */
+	#ifdef CONFIG_PRIZE_DUAL_CAMERA_ENABLE		
+		if(sensor_idx == 0){
+			state_index = (pin_state > IMGSENSOR_HW_PIN_STATE_LEVEL_0)
+				? pinst->drive_current[(unsigned int)sensor_idx]
+				: MCLK_STATE_DISABLE;
+
+			ppinctrl_state =
+			pinst->ppinctrl_state[(unsigned int)sensor_idx+4][(unsigned int)state_index];
+		#if 1
+			pr_debug(
+				"%s : sensor_idx %d pinctrl, pin %d, pin_state %d, drive_current %d\n",
+				__func__,
+				sensor_idx+4,
+				pin,
+				pin_state,
+				pinst->drive_current[(unsigned int)sensor_idx]);
+
+		#endif
+			mutex_lock(&pinctrl_mutex);
+			if (ppinctrl_state != NULL && !IS_ERR(ppinctrl_state))
+				pinctrl_select_state(pinst->ppinctrl, ppinctrl_state);
+			else
+				pr_err(
+					"%s : sensor_idx %d fail to set pinctrl, PinIdx %d, Val %d drive current %d\n",
+					__func__,
+					sensor_idx,
+					pin,
+					pin_state,
+					pinst->drive_current[(unsigned int)sensor_idx]);
+			mutex_unlock(&pinctrl_mutex);
+		}
+	#endif
+	/*prize add by zhuzhengjiang for dcam_r mclk 20210630 end */ 
 	}
 	return ret;
 }

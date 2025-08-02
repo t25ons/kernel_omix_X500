@@ -38,6 +38,9 @@
 #include "mtk_charger_intf.h"
 #include "rt9471.h"
 #define RT9471_DRV_VERSION	"1.0.14_MTK"
+#if defined(CONFIG_MTK_DUAL_CHARGER_SUPPORT) || defined(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT)
+extern int is_chg2_exist;
+#endif
 
 enum rt9471_stat_idx {
 	RT9471_STATIDX_STAT0 = 0,
@@ -2187,7 +2190,9 @@ static int rt9471_reset_register(struct rt9471_chip *chip)
 static bool rt9471_check_devinfo(struct rt9471_chip *chip)
 {
 	int ret = 0;
-
+#if defined(CONFIG_MTK_DUAL_CHARGER_SUPPORT) || defined(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT)
+	is_chg2_exist = 0;
+#endif
 	ret = i2c_smbus_read_byte_data(chip->client, RT9471_REG_INFO);
 	if (ret < 0) {
 		dev_notice(chip->dev, "%s get devinfo fail(%d)\n",
@@ -2200,6 +2205,9 @@ static bool rt9471_check_devinfo(struct rt9471_chip *chip)
 	case RT9470D_DEVID:
 	case RT9471_DEVID:
 	case RT9471D_DEVID:
+#if defined(CONFIG_MTK_DUAL_CHARGER_SUPPORT) || defined(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT)
+		is_chg2_exist = 1;
+#endif
 		break;
 	default:
 		dev_notice(chip->dev, "%s incorrect devid 0x%02X\n",
@@ -2209,7 +2217,10 @@ static bool rt9471_check_devinfo(struct rt9471_chip *chip)
 	chip->dev_rev = (ret & RT9471_DEVREV_MASK) >> RT9471_DEVREV_SHIFT;
 	dev_info(chip->dev, "%s id = 0x%02X, rev = 0x%02X\n",
 			    __func__, chip->dev_id, chip->dev_rev);
-
+#if defined(CONFIG_MTK_DUAL_CHARGER_SUPPORT) || defined(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT)
+	dev_info(chip->dev, "%s is_chg2_exist=%d\n",
+				__func__, is_chg2_exist);
+#endif
 	return true;
 }
 

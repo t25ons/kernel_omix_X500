@@ -19,6 +19,7 @@
 #include <upmu_common.h>
 #include "mtk_charger_intf.h"
 #include "mtk_charger_init.h"
+extern bool prize_is_pump_express(void);  // prize add by liaoxingen for pump express menu switch
 
 static int pe20_set_mivr(struct charger_manager *pinfo, int uV);
 
@@ -478,6 +479,8 @@ int mtk_pe20_check_charger(struct charger_manager *pinfo)
 {
 	int ret = 0;
 	struct mtk_pe20 *pe20 = &pinfo->pe2;
+	
+	chr_debug("%s pinfo->enable_pe_2=%d, pe20->is_enabled=%d\n", __func__,pinfo->enable_pe_2,pe20->is_enabled);
 
 	if (!pinfo->enable_hv_charging) {
 		pr_info("%s: hv charging is disabled\n", __func__);
@@ -501,7 +504,7 @@ int mtk_pe20_check_charger(struct charger_manager *pinfo)
 
 	chr_debug("%s\n", __func__);
 
-	if (pe20->is_cable_out_occur)
+	if (pe20->is_cable_out_occur /*|| !prize_is_pump_express()*/)
 		mtk_pe20_plugout_reset(pinfo);
 
 	/* Not to check charger type or
@@ -589,10 +592,10 @@ int mtk_pe20_start_algorithm(struct charger_manager *pinfo)
 	__pm_stay_awake(&pe20->suspend_lock);
 	chr_debug("%s\n", __func__);
 
-	if (pe20->is_cable_out_occur)
+	if (pe20->is_cable_out_occur || !prize_is_pump_express())
 		mtk_pe20_plugout_reset(pinfo);
 
-	if (!pe20->is_connect) {
+	if (!pe20->is_connect|| !prize_is_pump_express()) {
 		ret = -EIO;
 		chr_info("%s: stop, PE+20 is not connected\n",
 			__func__);
@@ -682,7 +685,8 @@ void mtk_pe20_set_is_enable(struct charger_manager *pinfo, bool enable)
 
 	chr_info("%s: enable = %d\n", __func__, enable);
 	pinfo->pe2.is_enabled = enable;
-
+//	pinfo->pe2.is_enabled = (prize_is_pump_express()?pinfo->pe2.is_enabled:false); // prize add by liaoxingen for pump express menu switch
+		
 	__pm_relax(&pinfo->pe2.suspend_lock);
 	mutex_unlock(&pinfo->pe2.access_lock);
 }

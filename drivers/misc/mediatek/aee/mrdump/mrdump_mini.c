@@ -754,7 +754,6 @@ void mrdump_mini_ke_cpu_regs(struct pt_regs *regs)
 	mrdump_mini_cpu_regs(cpu, regs, current, 1);
 	mrdump_mini_add_loads();
 	mrdump_mini_build_task_info(regs);
-	mrdump_modules_info(NULL, -1);
 	mrdump_mini_add_extra_misc();
 }
 EXPORT_SYMBOL(mrdump_mini_ke_cpu_regs);
@@ -859,8 +858,6 @@ static void mrdump_mini_add_loads(void)
 						MRDUMP_MINI_SECTION_SIZE);
 			cpu = prstatus->pr_pid - 100;
 			mrdump_mini_add_tsk_ti(cpu, &regs, tsk, 1);
-			mrdump_mini_add_entry((unsigned long)cpu_rq(cpu),
-					MRDUMP_MINI_SECTION_SIZE);
 		} else if (prstatus->pr_pid <= AEE_MTK_CPU_NUMS) {
 			cpu = prstatus->pr_pid - 1;
 			mrdump_mini_add_tsk_ti(cpu, &regs, tsk, 0);
@@ -874,8 +871,6 @@ static void mrdump_mini_add_loads(void)
 		}
 	}
 
-	mrdump_mini_add_entry((unsigned long)__per_cpu_offset,
-			MRDUMP_MINI_SECTION_SIZE);
 	mrdump_mini_add_entry((unsigned long)&mem_map,
 			MRDUMP_MINI_SECTION_SIZE);
 	mrdump_mini_add_entry((unsigned long)mem_map, MRDUMP_MINI_SECTION_SIZE);
@@ -886,8 +881,6 @@ static void mrdump_mini_add_loads(void)
 				ti = (struct thread_info *)tsk->stack;
 			else
 				ti = NULL;
-			mrdump_mini_add_entry((unsigned long)cpu_rq(cpu),
-					MRDUMP_MINI_SECTION_SIZE);
 			mrdump_mini_add_entry((unsigned long)tsk,
 					MRDUMP_MINI_SECTION_SIZE);
 			mrdump_mini_add_entry((unsigned long)ti,
@@ -974,7 +967,7 @@ static void __init mrdump_mini_elf_header_init(void)
 
 int mrdump_mini_init(void)
 {
-	int i;
+	int i, cpu;
 	unsigned long size, offset;
 	struct pt_regs regs;
 
@@ -1022,6 +1015,15 @@ int mrdump_mini_init(void)
 		  ((unsigned long) &kallsyms_addresses +
 		  (mrdump_cblock->machdesc.kallsyms.size / 2 - PAGE_SIZE)),
 		  mrdump_cblock->machdesc.kallsyms.size + 2 * PAGE_SIZE);
+	}
+
+	/* add __per_cpu_offset */
+	mrdump_mini_add_entry((unsigned long)__per_cpu_offset,
+			MRDUMP_MINI_SECTION_SIZE);
+
+	for (cpu = 0; cpu < AEE_MTK_CPU_NUMS; cpu++) {
+		mrdump_mini_add_entry((unsigned long)cpu_rq(cpu),
+				MRDUMP_MINI_SECTION_SIZE);
 	}
 
 	return 0;

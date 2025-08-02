@@ -74,10 +74,35 @@
 #include "mtk_charger_intf.h"
 #include "mtk_charger_init.h"
 
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-start
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+enum wireless_charge_protocol {
+	PROTOCOL_UNKNOWN = 0,
+	BPP,
+	EPP,
+	AFC,
+};
+enum wireless_charge_protocol check_wireless_charge_status (void);
+#endif
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-end
+bool g_pump_express;	/* prize add by liaoxingen for pump express menu switch */
+//prize add by pengzhipeng for Bright screen current limit  20210127 start 
+#if defined(CONFIG_PRIZE_CHARGE_CTRL_POLICY)
+#include <linux/fb.h>
+
+int g_charge_is_screen_on = 1;
+#endif
+//prize add by pengzhipeng for Bright screen current limit  20210127 end  
 static struct charger_manager *pinfo;
 static struct list_head consumer_head = LIST_HEAD_INIT(consumer_head);
 static DEFINE_MUTEX(consumer_mutex);
 
+/* Prize HanJiuping added 20210706 for GIGASET customized charge restriction feature start */
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+extern int turn_off_5725(int en);
+extern void set_wireless_disable_flag(bool flag);
+#endif
+/* Prize HanJiuping added 20210706 for GIGASET customized charge restriction feature end */
 
 bool mtk_is_TA_support_pd_pps(struct charger_manager *pinfo)
 {
@@ -99,6 +124,42 @@ bool is_power_path_supported(void)
 
 	return false;
 }
+
+//prize add by pengzhipeng for Bright screen current limit  20210127 start 
+#if defined(CONFIG_PRIZE_CHARGE_CTRL_POLICY)
+static int charge_fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
+{
+	struct fb_event *evdata = NULL;
+	int blank;
+	//int err = 0;
+	evdata = data;
+	/* If we aren't interested in this event, skip it immediately ... */
+	if (event != FB_EVENT_BLANK)
+		return 0;
+
+	blank = *(int *)evdata->data;
+	switch (blank) {
+		case FB_BLANK_UNBLANK:
+			g_charge_is_screen_on = 1;
+			break;
+		case FB_BLANK_POWERDOWN:
+			g_charge_is_screen_on = 0;
+			break;
+		default:
+			break;
+	}
+	chr_err("%s: g_charge_is_screen_on[%d]\n", __func__,g_charge_is_screen_on);
+
+    if(1 == g_charge_is_screen_on)
+        _wake_up_charger(pinfo);
+    
+    return 0;
+}
+static struct notifier_block charge_fb_notifier = {
+	.notifier_call = charge_fb_notifier_callback,
+};
+#endif
+//prize add by pengzhipeng for Bright screen current limit  20210127 end  
 
 bool is_disable_charger(void)
 {
@@ -401,6 +462,13 @@ int charger_manager_enable_charging(struct charger_consumer *consumer,
 	return ret;
 }
 
+
+//prize added by sunshuai, wireless charge MT5725	15W soft start, 20200428-start
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+extern int get_MT5725_status(void);
+#endif
+//prize added by sunshuai, wireless charge MT5725	15W soft start, 20200428-end
+
 int charger_manager_set_input_current_limit(struct charger_consumer *consumer,
 	int idx, int input_current)
 {
@@ -408,6 +476,18 @@ int charger_manager_set_input_current_limit(struct charger_consumer *consumer,
 
 	if (info != NULL) {
 		struct charger_data *pdata;
+
+//prize added by sunshuai, wireless charge MT5725	15W soft start, 20200428-start
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+	if(get_MT5725_status() == 0){
+		chr_err("%s: 5725_15W  charge \n",__func__);
+	} else {
+	    chr_err("%s: no  5725_15W  charge \n",__func__);
+		return 0;
+	}
+#endif
+//prize added by sunshuai, wireless charge MT5725	15W soft start, 20200428-end
+
 
 		if (info->data.parallel_vbus) {
 			if (idx == TOTAL_CHARGER) {
@@ -447,6 +527,17 @@ int charger_manager_set_charging_current_limit(
 
 	if (info != NULL) {
 		struct charger_data *pdata;
+
+//prize added by sunshuai, wireless charge MT5725	15W soft start, 20200428-start
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+		if(get_MT5725_status() == 0){
+			chr_err("%s: 5725_15W  charge \n",__func__);
+		} else {
+			chr_err("%s: no  5725_15W  charge \n",__func__);
+			return 0;
+		}
+#endif
+//prize added by sunshuai, wireless charge MT5725	15W soft start, 20200428-end
 
 		if (idx == MAIN_CHARGER)
 			pdata = &info->chg1_data;
@@ -1913,6 +2004,7 @@ static int mtk_charger_parse_dt(struct charger_manager *info,
 	info->disable_pd_dual = of_property_read_bool(np, "disable_pd_dual");
 
 	info->enable_hv_charging = true;
+	g_pump_express = (info->enable_pe_plus||info->enable_pe_2||info->enable_pe_5);	/* prize add by liaoxingen for pump express menu switch */
 
 	/* common */
 	if (of_property_read_u32(np, "battery_cv", &val) >= 0)
@@ -2594,7 +2686,14 @@ static int mtk_charger_parse_dt(struct charger_manager *info,
 
 	return 0;
 }
-
+				
+/* prize add by liaoxingen for pump express menu switch 20211130 start */
+bool prize_is_pump_express(void) 
+{
+	pr_debug("%s g_pump_express=%d\n", __func__,g_pump_express);
+	return g_pump_express;
+}
+/* prize add by liaoxingen for pump express menu switch 20211130 end */
 
 static ssize_t show_Pump_Express(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -2602,10 +2701,10 @@ static ssize_t show_Pump_Express(struct device *dev,
 	struct charger_manager *pinfo = dev->driver_data;
 	int is_ta_detected = 0;
 
-	pr_debug("[%s] chr_type:%d UISOC:%d startsoc:%d stopsoc:%d\n", __func__,
+	pr_debug("[%s] chr_type:%d UISOC:%d startsoc:%d stopsoc:%d,g_pump_express=%d\n", __func__,
 		mt_get_charger_type(), battery_get_uisoc(),
 		pinfo->data.ta_start_battery_soc,
-		pinfo->data.ta_stop_battery_soc);
+		pinfo->data.ta_stop_battery_soc,g_pump_express);
 
 	if (IS_ENABLED(CONFIG_MTK_PUMP_EXPRESS_PLUS_20_SUPPORT)) {
 		/* Is PE+20 connect */
@@ -2618,7 +2717,12 @@ static ssize_t show_Pump_Express(struct device *dev,
 		if (mtk_pe_get_is_connect(pinfo))
 			is_ta_detected = 1;
 	}
-
+//prize-add pe50 Pump Express func-pengzhipeng-20210427-start
+	if (IS_ENABLED(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT)){
+		if (mtk_pe50_get_is_connect(pinfo))
+			is_ta_detected = 1;
+	}
+//prize-add pe50 Pump Express func-pengzhipeng-20210427-end
 	if (mtk_is_TA_support_pd_pps(pinfo) == true)
 		is_ta_detected = 1;
 
@@ -2627,10 +2731,45 @@ static ssize_t show_Pump_Express(struct device *dev,
 		mtk_pe20_get_is_connect(pinfo),
 		mtk_pe_get_is_connect(pinfo));
 
-	return sprintf(buf, "%u\n", is_ta_detected);
+//	return sprintf(buf, "%u\n", is_ta_detected);
+/* prize modify by liaoxingen for pump express menu switch start */
+	if(g_pump_express)
+	{
+		if (is_ta_detected == 1)
+			return sprintf(buf, "%u\n", 1);
+		else
+			return sprintf(buf, "%u\n", 2);
+	} else
+		return sprintf(buf, "%u\n", 0);
+/* prize modify by liaoxingen for pump express menu switch end */
 }
-
-static DEVICE_ATTR(Pump_Express, 0444, show_Pump_Express, NULL);
+static ssize_t store_Pump_Express(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct charger_manager *pinfo = dev->driver_data;
+	unsigned int reg = 0;
+	int ret;
+	
+	if (buf != NULL && size != 0) {
+		ret = kstrtouint(buf, 0, &reg);
+	}
+	g_pump_express = ((reg > 0)?true:false);
+	pr_debug("[Battery] %s, reg = %d, g_pump_express=%d\n", __func__,reg, g_pump_express);
+	if (IS_ENABLED(CONFIG_MTK_PUMP_EXPRESS_PLUS_20_SUPPORT))
+	{
+		pinfo->enable_pe_2 = g_pump_express;
+	}
+	if (IS_ENABLED(CONFIG_MTK_PUMP_EXPRESS_PLUS_SUPPORT))
+	{
+		pinfo->enable_pe_plus = g_pump_express;
+	}
+	if (IS_ENABLED(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT))
+	{
+		pinfo->enable_pe_5 = g_pump_express;
+	}
+	return size;
+}
+static DEVICE_ATTR(Pump_Express, 0444, show_Pump_Express, store_Pump_Express);
 
 static ssize_t show_input_current(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -2806,6 +2945,128 @@ static int mtk_chg_current_cmd_show(struct seq_file *m, void *data)
 	seq_printf(m, "%d %d\n", pinfo->usb_unlimited, pinfo->cmd_discharging);
 	return 0;
 }
+
+//add by mahuiyin 20190410 start
+#if defined(CONFIG_MTK_DUAL_CHARGER_SUPPORT) || defined(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT)
+int is_chg2_exist = 0;
+///sys/devices/platform/charger/chg2_exist
+static ssize_t show_chg2_exist(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", is_chg2_exist);
+}
+static DEVICE_ATTR(chg2_exist, 0664, show_chg2_exist, NULL);
+#endif
+//add by mahuiyin 20190410 end
+//prize add by sunshuai 2020-0407 for Charging restrictions start
+#if defined (CONFIG_PRIZE_GIGASET_CHARGE_RESTRICTION)
+static ssize_t show_cmd_charge_disable(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct charger_manager *pinfo = dev->driver_data;
+
+	pr_info("[charge] %s : %d\n",__func__, pinfo->cmd_discharging);
+	return sprintf(buf, "%d\n",pinfo->cmd_discharging);
+}
+
+static ssize_t store_cmd_charge_disable(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct charger_manager *pinfo = dev->driver_data;
+	unsigned int reg = 0;
+	int ret;
+	bool chg2_chip_enabled = false;
+	charger_dev_is_chip_enabled(pinfo->chg2_dev, &chg2_chip_enabled);
+
+	pr_info("[charge] %s\n", __func__);
+	if (buf != NULL && size != 0) {
+		pr_info("[store_cmd_charge_disable] buf is %s and size is %zu\n", buf, size);
+		ret = kstrtouint(buf, 16, &reg);
+		if(reg == 1){
+		   pinfo->cmd_discharging = true;
+/* Prize HanJiuping added 20210706 for GIGASET customized charge restriction feature start */
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+			/* Turn wireless charge off if support */
+			turn_off_5725(1);
+			set_wireless_disable_flag(true);
+#endif /*CONFIG_PRIZE_MT5725_SUPPORT_15W*/
+		}else if(reg == 0){
+		   pinfo->cmd_discharging = false;
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+			/* Resume wireless charge on if support */
+			set_wireless_disable_flag(false);
+			turn_off_5725(0);
+#endif /*CONFIG_PRIZE_MT5725_SUPPORT_15W*/
+/* Prize HanJiuping added 20210706 for GIGASET customized charge restriction feature end */
+		}else{
+		  pr_info("[store_cmd_charge_disable] input err please 0 or 1\n");
+		}
+
+		if((pinfo->chr_type != CHARGER_UNKNOWN) && (reg == 1)){
+		   charger_dev_enable(pinfo->chg1_dev, false);
+		   if(chg2_chip_enabled){
+		   	   charger_dev_enable(pinfo->chg2_dev, false);
+			   charger_dev_enable_chip(pinfo->chg2_dev, false);
+		   }
+		   charger_manager_notifier(pinfo,CHARGER_NOTIFY_STOP_CHARGING);
+		   pr_info("[store_cmd_charge_disable] disable charge\n");
+		}else if((pinfo->chr_type != CHARGER_UNKNOWN) && (reg == 0)){
+		   charger_dev_enable(pinfo->chg1_dev, true);
+		   charger_manager_notifier(pinfo,CHARGER_NOTIFY_START_CHARGING);
+		   pr_info("[store_cmd_charge_disable]  enable charge \n");
+		}else {
+		   pr_info("[store_cmd_charge_disable]  No USB connection \n");
+		}
+	}
+	return size;
+}
+static DEVICE_ATTR(cmd_charge_disable, 0664, show_cmd_charge_disable,
+		store_cmd_charge_disable);
+
+bool get_cmd_charge_disable(void){
+   pr_info("[charge] %s cmd_discharging =%d \n", __func__,pinfo->cmd_discharging);
+   return pinfo->cmd_discharging;
+}
+EXPORT_SYMBOL(get_cmd_charge_disable);
+#endif
+//prize add by sunshuai 2020-0407 for Charging restrictions end
+
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-start
+#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
+static ssize_t show_wireless_status(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+   enum wireless_charge_protocol type = PROTOCOL_UNKNOWN;
+   
+   if(pinfo->chr_type == NONSTANDARD_CHARGER)
+	   type = check_wireless_charge_status();
+
+	pr_info(" %s type =%d\n",__func__, type);
+	return sprintf(buf, "%d\n",type);
+}
+
+static DEVICE_ATTR(wireless_status, 0664, show_wireless_status,NULL);
+#endif
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-end
+
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-start
+#if defined(CONFIG_PRIZE_WIRELESS_RECEIVER_MAXIC_MT5715)
+int confirm_MT5715_works(void);
+
+static ssize_t show_wireless_status(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+  // enum wireless_charge_protocol type = PROTOCOL_UNKNOWN;
+   int type = 0;
+   if(pinfo->chr_type == NONSTANDARD_CHARGER)
+	   type = confirm_MT5715_works();
+
+	pr_info(" %s type =%d\n",__func__, type);
+	return sprintf(buf, "%d\n",type);
+}
+
+static DEVICE_ATTR(wireless_status, 0664, show_wireless_status,NULL);
+#endif
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-end
 
 static ssize_t mtk_chg_current_cmd_write(struct file *file,
 		const char *buffer, size_t count, loff_t *data)
@@ -3006,6 +3267,30 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 		chr_err("[%s]: mkdir /proc/mtk_battery_cmd failed\n", __func__);
 		return -ENOMEM;
 	}
+	
+	//add by mahuiyin 20190410 start
+#if defined(CONFIG_MTK_DUAL_CHARGER_SUPPORT) || defined(CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT)
+		ret = device_create_file(&(pdev->dev), &dev_attr_chg2_exist);
+		if (ret)
+			goto _out;
+#endif
+//add by mahuiyin 20190410 start
+//prize add by sunshuai 2020-0407 start
+#if defined (CONFIG_PRIZE_GIGASET_CHARGE_RESTRICTION)
+			ret = device_create_file(&(pdev->dev), &dev_attr_cmd_charge_disable);
+			if (ret)
+			   goto _out;
+#endif
+//prize add by sunshuai 2020-0407 end
+
+
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-start
+#if defined (CONFIG_PRIZE_MT5725_SUPPORT_15W)
+			ret = device_create_file(&(pdev->dev), &dev_attr_wireless_status);
+				if (ret)
+				   goto _out;
+#endif
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-end
 
 	proc_create_data("current_cmd", 0640, battery_dir,
 			&mtk_chg_current_cmd_fops, info);
@@ -3789,7 +4074,20 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		charger_manager_get_by_name(&pdev->dev, "charger_port1");
 	info->init_done = true;
 	_wake_up_charger(info);
-
+//prize add by pengzhipeng for Bright screen current limit  20210127 start  
+#if defined(CONFIG_PRIZE_CHARGE_CTRL_POLICY)
+		ret = fb_register_client(&charge_fb_notifier);
+		if (ret)
+			pr_debug("[%s] failed to register charger_fb_notifier_block %d\n", __func__, ret);
+#endif
+//prize add by pengzhipeng for Bright screen current limit  20210127 end  
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-start
+#if defined (CONFIG_PRIZE_WIRELESS_RECEIVER_MAXIC_MT5715)
+			ret = device_create_file(&(pdev->dev), &dev_attr_wireless_status);
+				if (ret)
+				   pr_debug("[%s] failed to register dev_attr_wireless_status %d\n", __func__, ret);
+#endif
+//prize added by sunshuai, 5725 Wireless charging type identification 20200805-end
 	return 0;
 }
 

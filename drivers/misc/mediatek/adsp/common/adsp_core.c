@@ -68,6 +68,7 @@ bool is_adsp_system_running(void)
 	}
 	return false;
 }
+EXPORT_SYMBOL(is_adsp_system_running);
 
 void __iomem *adsp_get_sharedmem_base(struct adsp_priv *pdata, int id)
 {
@@ -188,8 +189,9 @@ static irqreturn_t adsp_irq_dispatcher(int irq, void *data)
 	adsp_mt_clr_spm(pdata->cid);
 	if (!pdata->irq_cb || !pdata->clear_irq)
 		return IRQ_NONE;
-	pdata->clear_irq(pdata->cid);
 	pdata->irq_cb(irq, pdata->data, pdata->cid);
+	pdata->clear_irq(pdata->cid);
+	wmb(); /* drain writebuffer */
 	return IRQ_HANDLED;
 }
 

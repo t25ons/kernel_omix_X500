@@ -36,15 +36,6 @@
 #define MTK_DRM_CMDQ_ASYNC
 #define CONFIG_MTK_DISPLAY_CMDQ
 #define MTK_FILL_MIPI_IMPEDANCE
-#if (defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6873)\
-	|| defined(CONFIG_MACH_MT6893) ||\
-	defined(CONFIG_MACH_MT6853) || \
-	defined(CONFIG_MACH_MT6833)) &&\
-	defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
-//#define MTK_DRM_DELAY_PRESENT_FENCE
-/* Delay present fence would cause config merge */
-#endif
-
 
 struct device;
 struct device_node;
@@ -112,6 +103,7 @@ struct mtk_drm_private {
 	unsigned int num_sessions;
 	enum MTK_DRM_SESSION_MODE session_mode;
 	atomic_t crtc_present[MAX_CRTC];
+	atomic_t crtc_sf_present[MAX_CRTC];
 
 	struct device_node *mutex_node;
 	struct device *mutex_dev;
@@ -142,6 +134,7 @@ struct mtk_drm_private {
 	struct drm_property *crtc_property[MAX_CRTC][CRTC_PROP_MAX];
 
 	struct drm_fb_helper fb_helper;
+	struct kref kref_fb_buf;
 	struct drm_gem_object *fbdev_bo;
 	struct list_head lyeblob_head;
 	struct mutex lyeblob_list_mutex;
@@ -182,6 +175,7 @@ struct mtk_drm_private {
 	int need_vds_path_switch;
 	int vds_path_switch_dirty;
 	int vds_path_switch_done;
+	int need_vds_path_switch_back;
 	int vds_path_enable;
 
 	/* Due to 2nd display share 1 secure gce client, need store here */
@@ -257,6 +251,8 @@ void drm_trigger_repaint(enum DRM_REPAINT_TYPE type,
 int mtk_drm_suspend_release_fence(struct device *dev);
 void mtk_drm_suspend_release_present_fence(struct device *dev,
 					   unsigned int index);
+void mtk_drm_suspend_release_sf_present_fence(struct device *dev,
+					      unsigned int index);
 void mtk_drm_top_clk_prepare_enable(struct drm_device *drm);
 void mtk_drm_top_clk_disable_unprepare(struct drm_device *drm);
 struct mtk_panel_params *mtk_drm_get_lcm_ext_params(struct drm_crtc *crtc);

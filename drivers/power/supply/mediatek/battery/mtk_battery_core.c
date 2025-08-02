@@ -81,7 +81,16 @@
 #include "simulator_kernel.h"
 #endif
 
-
+/* prize added by chenjiaxi, battery info, 20190115-start */
+#if defined(CONFIG_PRIZE_HARDWARE_INFO_BAT)
+#include "../../../misc/mediatek/hardware_info/hardware_info.h"
+extern struct hardware_info current_battery_info;
+unsigned char s_Q_MAX_50[32] = "0";
+unsigned char s_Q_MAX_25[32] = "0";
+unsigned char s_Q_MAX_0[32] = "0";
+unsigned char s_Q_MAX_10[32] = "0";
+#endif
+/* prize added by chenjiaxi, battery info, 20190115-end */
 
 /* ============================================================ */
 /* global variable */
@@ -909,9 +918,89 @@ static void fg_custom_parse_table(const struct device_node *np,
 		profile_p->resistance2 = resistance2;
 		idx = idx + column;
 	}
+	/* prize added by chenjiaxi, battery info, 20190115-start */
+#if defined(CONFIG_PRIZE_HARDWARE_INFO_BAT)
+	strcpy(current_battery_info.batt_versions, "V0.0.0");
+	    if (!strcmp(node_srting, "battery0_profile_t0")) {
+        sprintf(s_Q_MAX_50,"%d",profile_p->mah);
+        strcpy(current_battery_info.Q_MAX_50, s_Q_MAX_50);
+    } else if (!strcmp(node_srting, "battery0_profile_t1")) {
+        sprintf(s_Q_MAX_25,"%d",profile_p->mah);
+        strcpy(current_battery_info.Q_MAX_25, s_Q_MAX_25);
+		    } else if (!strcmp(node_srting, "battery0_profile_t3")) {
+        sprintf(s_Q_MAX_0,"%d",profile_p->mah);
+        strcpy(current_battery_info.Q_MAX_0, s_Q_MAX_0);
+    } else if (!strcmp(node_srting, "battery0_profile_t4")) {
+        sprintf(s_Q_MAX_10,"%d",profile_p->mah);
+        strcpy(current_battery_info.Q_MAX_10, s_Q_MAX_10);
+		    }
+#endif
+/* prize added by chenjiaxi, battery info, 20190115-end */
 }
 
+/* struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[21]; */
+static void fg_custom_part_ntc_table(const struct device_node *np,
+		struct FUELGAUGE_TEMPERATURE *profile_struct)
+{
+	struct FUELGAUGE_TEMPERATURE *p_fg_temp_table;
+	int bat_temp = 0, temperature_r = 0;
+	int saddles = 0, idx = 0, ret = 0, ret_a = 0;
+#if 0
+	int i;
+#endif
+	p_fg_temp_table = profile_struct;
 
+#if 0 /* dump */
+	bm_err("[before]Fg_Temperature_Table - bat_temp : temperature_r\n");
+	for (i = 0; i < 21; i++) {
+		bm_err("%d : %d %d\n", i, Fg_Temperature_Table[i].BatteryTemp,
+			Fg_Temperature_Table[i].TemperatureR);
+	}
+#endif
+
+	ret = fg_read_dts_val(np, "RBAT_TYPE", &(gm.rbat.type), 1);
+	ret_a = fg_read_dts_val(np, "RBAT_PULL_UP_R",
+			&(gm.rbat.rbat_pull_up_r), 1);
+	if ((ret == -1) || (ret_a == -1)) {
+		bm_err("Fail to get ntc type from dts.Keep default value\t");
+		bm_err("RBAT_TYPE=%d, RBAT_PULL_UP_R=%d\n",
+			gm.rbat.type, gm.rbat.rbat_pull_up_r);
+		return;
+	}
+	bm_err("From DTS. RBAT_TYPE = %d, RBAT_PULL_UP_R=%d\n",
+		gm.rbat.type, gm.rbat.rbat_pull_up_r);
+
+	fg_read_dts_val(np, "rbat_temperature_table_num", &saddles, 1);
+	bm_err("%s : rbat_temperature_table_num(%d)\n", __func__, saddles);
+
+	idx = 0;
+
+	while (1) {
+		ret = of_property_read_u32_index(np, "rbat_battery_temperature",
+							idx, &bat_temp);
+
+		idx++;
+		if (!of_property_read_u32_index(
+			np, "rbat_battery_temperature", idx, &temperature_r))
+			bm_debug("bat_temp = %d, temperature_r=%d\n",
+					bat_temp, temperature_r);
+
+		p_fg_temp_table->BatteryTemp = bat_temp;
+		p_fg_temp_table->TemperatureR = temperature_r;
+
+		p_fg_temp_table++;
+		if ((idx++) >= (saddles * 2))
+			break;
+	}
+
+#if 0 /* dump */
+	bm_err("[after]Fg_Temperature_Table - bat_temp : temperature_r\n");
+	for (i = 0; i < saddles; i++) {
+		bm_err("%d : %d %d\n", i, Fg_Temperature_Table[i].BatteryTemp,
+			Fg_Temperature_Table[i].TemperatureR);
+	}
+#endif
+}
 
 void fg_custom_init_from_dts(struct platform_device *dev)
 {
@@ -967,6 +1056,8 @@ void fg_custom_init_from_dts(struct platform_device *dev)
 		&(fg_cust_data.com_r_fg_value), UNIT_TRANS_10);
 	if (ret == -1)
 		fg_cust_data.com_r_fg_value = fg_cust_data.r_fg_value;
+
+	fg_custom_part_ntc_table(np, Fg_Temperature_Table);
 
 	fg_read_dts_val(np, "FULL_TRACKING_BAT_INT2_MULTIPLY",
 		&(fg_cust_data.full_tracking_bat_int2_multiply), 1);
@@ -4135,6 +4226,27 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 	}
 	break;
 
+	case FG_DAEMON_CMD_SET_BATTERY_CAPACITY:
+	{
+		struct fgd_cmd_param_t_8 param;
+
+		memcpy(&param, &msg->fgd_data[0],
+			sizeof(struct fgd_cmd_param_t_8));
+		bm_debug(
+			"[fr] FG_DAEMON_CMD_SET_BATTERY_CAPACITY = %d %d %d %d %d %d %d %d %d %d RM:%d\n",
+			param.data[0],
+			param.data[1],
+			param.data[2],
+			param.data[3],
+			param.data[4],
+			param.data[5],
+			param.data[6],
+			param.data[7],
+			param.data[8],
+			param.data[9],
+			param.data[4] * param.data[6] / 10000);
+	}
+	break;
 	default:
 		bm_err("bad FG_DAEMON_CTRL_CMD_FROM_USER 0x%x\n", msg->fgd_cmd);
 		break;
