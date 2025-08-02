@@ -659,7 +659,17 @@ static struct snd_soc_dai_link mt_soc_exthp_dai[] = {
 #endif
 	},
 };
-
+//prize-add smartpa aw883xx-pengzhipeng-20211206-start
+#ifdef  CONFIG_SND_SMARTPA_AW883XX
+struct snd_soc_dai_link_component awinic_codecs[] = {
+	{
+	.of_node = NULL,
+	.dai_name = "aw883xx-aif-6-34",
+	.name = "aw883xx_smartpa.6-0034",
+	},
+};
+#endif
+//prize-add smartpa aw883xx-pengzhipeng-20211206-end
 static struct snd_soc_dai_link mt_soc_extspk_dai[] = {
 	{
 		.name = "ext_Speaker_Multimedia",
@@ -669,6 +679,11 @@ static struct snd_soc_dai_link mt_soc_extspk_dai[] = {
 #ifdef CONFIG_SND_SOC_MAX98926
 		.codec_dai_name = "max98926-aif1",
 		.codec_name = "MAX98926_MT",
+//prize-add smartpa aw883xx-pengzhipeng-20211206-start
+#elif defined(CONFIG_SND_SMARTPA_AW883XX)
+		.num_codecs = ARRAY_SIZE(awinic_codecs),
+		.codecs = awinic_codecs,
+//prize-add smartpa aw883xx-pengzhipeng-20211206-end
 #elif defined(CONFIG_SND_SOC_CS35L35)
 		.codec_dai_name = "cs35l35-pcm",
 		.codec_name = "cs35l35.2-0040",
@@ -677,6 +692,11 @@ static struct snd_soc_dai_link mt_soc_extspk_dai[] = {
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS |
 			   SND_SOC_DAIFMT_NB_NF,
 		.ops = &cs35l35_ops,
+/*prize-add-pengzhipeng-20191014-start*/
+#elif defined(CONFIG_SND_SMARTPA_AW8898)
+		.codec_dai_name = "aw8898-aif",
+		.codec_name = "aw8898_smartpa",
+/*prize-add-pengzhipeng-20191014-end*/
 #else
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
@@ -719,6 +739,8 @@ static int mt_soc_snd_probe(struct platform_device *pdev)
 	struct device_node *btcvsd_node;
 	int ret;
 	int daiLinkNum = 0;
+//prize-add smartpa aw883xx-pengzhipeng-20211206-start
+#if !defined(CONFIG_SND_SMARTPA_AW8898) && !defined(CONFIG_SND_SMARTPA_AW883XX)
 
 	ret = mtk_spk_update_dai_link(mt_soc_extspk_dai, pdev);
 	if (ret) {
@@ -726,7 +748,8 @@ static int mt_soc_snd_probe(struct platform_device *pdev)
 			__func__);
 		return -EINVAL;
 	}
-
+#endif
+//prize-add smartpa aw883xx-pengzhipeng-20211206-end
 	/*get_ext_dai_codec_name();*/
 	pr_debug("dai_link = %p\n",
 		mt_snd_soc_card_mt.dai_link);

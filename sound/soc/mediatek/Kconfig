@@ -262,6 +262,14 @@ config SND_SOC_MT8173_RT5650_RT5676
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_SOC_MT8185_EVB
+	tristate "ASoc Audio driver for MT8185 evb boards"
+	select SND_SOC_MT6785
+	help
+	  This adds ASoC driver
+	  for Mediatek MT8185 boards.
+	  Select Y if you have such device.
+	  Unsure please select "N".
 
 config SND_SOC_MT8167
 	tristate
@@ -343,6 +351,14 @@ config MTK_VOW_BARGE_IN_SUPPORT
 	  applying echo cancellation to remove speaker output signal.
 	  Select Y to enable CONFIG_MTK_VOW_BARGE_IN_SUPPORT for
 	  barge-in feature.
+
+#prize-add hac mode-pengzhipeng-20211206-start	  
+config HAC_MODE
+	int "Hac mode"
+	default 1
+	help
+	    Select hac mode  
+#prize-add hac mode-pengzhipeng-20211206-end	  
 
 config SND_SOC_MTK_AUDIO_DSP
 	bool "ASoC support for Mediatek audiodsp chip"

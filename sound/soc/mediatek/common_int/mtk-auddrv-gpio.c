@@ -54,6 +54,14 @@
 #include <linux/of.h>
 #include <linux/of_fdt.h>
 
+//prize-add hac function--pengzhipeng-20211206-start
+#if (CONFIG_HAC_MODE == 2)
+#define HAC_MODE 2
+static int rcvspk_mode = HAC_MODE;
+#endif 
+//prize-add hac function--pengzhipeng-20211206-end
+
+
 #if 1
 struct pinctrl *pinctrlaud;
 
@@ -587,17 +595,36 @@ int AudDrv_GPIO_EXTAMP2_Select(int bEnable, int mode)
 int AudDrv_GPIO_RCVSPK_Select(int bEnable)
 {
 	int retval = 0;
+//prize-add hac function--pengzhipeng-20211206-start
+#if (CONFIG_HAC_MODE == 2)
+	int i = 0;
+#endif
+//prize-add hac function--pengzhipeng-20211206-end
 
 #if MT6755_PIN
 	mutex_lock(&gpio_request_mutex);
 	if (bEnable == 1) {
-		if (aud_gpios[GPIO_RCVSPK_HIGH].gpio_prepare) {
-			retval = pinctrl_select_state(
-					 pinctrlaud,
-					 aud_gpios[GPIO_RCVSPK_HIGH].gpioctrl);
+		//prize-add hac function--pengzhipeng-20211206-start
+		#if (CONFIG_HAC_MODE == 2)
+			printk("%s rcvspk_mode = %d\n",__func__,rcvspk_mode);
+			for (; i < rcvspk_mode; i++){
+				retval = pinctrl_select_state(pinctrlaud, aud_gpios[GPIO_RCVSPK_LOW].gpioctrl);
+				udelay(2);
+				retval = pinctrl_select_state(pinctrlaud, aud_gpios[GPIO_RCVSPK_HIGH].gpioctrl);
+				udelay(2);
+			}
 			if (retval)
-				pr_info("could not set aud_gpios[GPIO_RCVSPK_HIGH] pins\n");
-		}
+				pr_err("could not set aud_gpios[GPIO_RCVSPK_HIGH] pins\n");
+		#else
+			if (aud_gpios[GPIO_RCVSPK_HIGH].gpio_prepare) {
+				retval = pinctrl_select_state(
+						 pinctrlaud,
+						 aud_gpios[GPIO_RCVSPK_HIGH].gpioctrl);
+				if (retval)
+					pr_info("could not set aud_gpios[GPIO_RCVSPK_HIGH] pins\n");
+			}
+		#endif
+		//prize-add hac function--pengzhipeng-20211206-end
 	} else {
 		if (aud_gpios[GPIO_RCVSPK_LOW].gpio_prepare) {
 			retval = pinctrl_select_state(

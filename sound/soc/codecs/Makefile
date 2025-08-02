@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
+subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
 
 snd-soc-88pm860x-objs := 88pm860x-codec.o
 snd-soc-ab8500-codec-objs := ab8500-codec.o
@@ -494,15 +494,35 @@ obj-$(CONFIG_SND_SOC_TPA6130A2)	+= snd-soc-tpa6130a2.o
 obj-$(CONFIG_SND_SOC_RT5509)	+= snd-soc-rt5509.o
 obj-$(CONFIG_SND_SOC_MT6660)	+= snd-soc-mt6660.o
 obj-$(CONFIG_SND_SOC_AW87339)	+= aw87339/
-
+# prize modified by lifenfen, add awinic smartpa aw8898, 20200103 begin
+obj-$(CONFIG_SND_SOC_AW8898)    += aw8898/
+# prize modified by lifenfen, add awinic smartpa aw8898, 20200103 end
+# prize modified by wyq, add awinic smartpa aw881xx, 20200103 begin
+obj-$(CONFIG_SND_SMARTPA_AW881XX)    += aw881xx/
+#prize add by lipengpeng 20210330 start 
+obj-$(CONFIG_SND_SMARTPA_AW881XX_V2)    += aw881xx_v2/
+#prize add by lipengpeng 20210330 end 
+# prize modified by wyq, add awinic smartpa aw881xx, 20200103 end
+# prize modified by liaoxingen, add awinic smartpa aw881xx, 20200601 begin
+obj-$(CONFIG_SND_SMARTPA_AW88194A_NEW)    += aw88194a/
+# prize modified by liaoxingen, add awinic smartpa aw881xx, 20200601 end 
 ifeq ($(CONFIG_SND_SOC_MT6358),y)
   MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
-  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
-  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
+  subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+  subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
 endif
 
 ifeq ($(CONFIG_SND_SOC_MT6359),y)
   MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
-  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
-  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/mt6359
+  subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+  subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/accdet/mt6359
 endif
+# prize added by chenjiaxi, add aw87519, 20200918-start
+obj-$(CONFIG_SND_SOC_AW87519)    += aw87519/
+# prize added by chenjiaxi, add aw87519, 20200918-end
+# prize added by huarui, add aw87359, 20200918-start
+obj-$(CONFIG_SND_SOC_AW87XXX)    += aw87xxx/
+# prize added by huarui, add aw87359, 20200918-end
+#prize-add smartpa aw883xx-pengzhipeng-20211206-start
+obj-$(CONFIG_SND_SMARTPA_AW883XX)    += aw883xx/
+#prize-add smartpa aw883xx-pengzhipeng-20211206-end
