@@ -1754,7 +1754,9 @@ static inline void __skb_insert(struct sk_buff *newsk,
 	list->qlen++;
 }
 
-static inline void __skb_queue_splice(const struct sk_buff_head *list,
+//static inline void __attribute__((no_sanitize("object-size")))  /* prize modify by liaoxingen 20220211 */
+static inline void 
+	__skb_queue_splice(const struct sk_buff_head *list,
 				      struct sk_buff *prev,
 				      struct sk_buff *next)
 {
