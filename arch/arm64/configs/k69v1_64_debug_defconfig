@@ -97,10 +97,15 @@ CONFIG_MTK_IMGSENSOR=y
 CONFIG_MTK_JPEG=y
 CONFIG_MTK_SMI_EXT=y
 CONFIG_MTK_LCM=y
-CONFIG_CUSTOM_KERNEL_LCM="hx83112b_fhdp_dsi_cmd_auo_rt5081 otm1911a_fhdp_dsi_vdo_truly_rt5081"
+#prize liaoxingen modify start
+CONFIG_CUSTOM_KERNEL_LCM="ft8756_fhdp_dsi_vdo_tcl"
+#prize liaoxingen modify end
 CONFIG_MTK_FB=y
 CONFIG_MTK_LCM_PHYSICAL_ROTATION="0"
-CONFIG_LCM_HEIGHT="2160"
+#prize liaoxingen modify start
+CONFIG_LCM_HEIGHT="2400"
+CONFIG_LCM_WIDTH="1080"
+#prize liaoxingen modify end 
 CONFIG_MTK_AAL_SUPPORT=y
 CONFIG_MTK_CAM_SECURITY_SUPPORT=y
 CONFIG_MTK_CAM_GENIEZONE_SUPPORT=y
